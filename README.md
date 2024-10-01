@@ -1,7 +1,7 @@
 # Citroen C5 II (2011) instrument panel cluster hacking (STM32G431KB)
 Similar story as for the sixth-generation Ford [Mustang (S550)](https://github.com/ufnalski/ford_mustang_cluster_h503rb) and the second-generation Peugeot [308 (T9)](https://github.com/ufnalski/peugeot_308_t9_cluster_g431kb). Let me therefore not to retell the whole story here.
 
-![Citroen C5 IPC in action](/Assets/Images/citroen_c5_ipc_in_action.JPG)
+![Citroen C5 IPC in action](/Assets/Images/citroen_c5_ipc_in_action.jpg)
 
 Check [/Assets/Images/](/Assets/Images/) for the pinout.
 
