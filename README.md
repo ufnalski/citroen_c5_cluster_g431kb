@@ -1,6 +1,12 @@
 # Citroen C5 II (2011) instrument panel cluster hacking (STM32G431KB)
 Similar story as for the sixth-generation Ford [Mustang (S550)](https://github.com/ufnalski/ford_mustang_cluster_h503rb) and the second-generation Peugeot [308 (T9)](https://github.com/ufnalski/peugeot_308_t9_cluster_g431kb). Let me therefore not to retell the whole story here.
 
+> [!WARNING]
+> Be careful when playing with the CAN message ID **0xF6**. It contains mileage that cannot be decreased for the Citroen C5 IPC. Moreover, once set to more than 999999 km it will overflow the range on the display and you will be able to see only "------ km" from now on (permanently) :slightly_frowning_face:
+
+> [!TIP]
+> The IPC sends the CAN message ID **0x257** at the power-up. The massage contains the current mileage stored in the IPC to prevent odometer fraud. You can read this value to send it back to the IPC and display it :slightly_smiling_face:
+
 ![Citroen C5 IPC in action](/Assets/Images/citroen_c5_ipc_in_action.jpg)
 
 Check [/Assets/Images/](/Assets/Images/) for the pinout.

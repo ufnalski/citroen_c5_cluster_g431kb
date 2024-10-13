@@ -395,7 +395,7 @@ void send_rpm_and_speed(uint16_t rpm, uint16_t speed,
 	TxData8[4] = 0x00;
 	TxData8[5] = 0x00;
 	TxData8[6] = 0x00;
-	TxData8[7] = 0x00; //0xD0;
+	TxData8[7] = 0xD0;
 	if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData8) != HAL_OK)
 	{
 		Error_Handler();
@@ -425,23 +425,22 @@ void send_fuel_level_and_oil_temp(uint8_t fuel, uint8_t oil_temp,
 }
 
 // --------------------------------------- 0xF6 (coolant temp and odometer) ---------
-void send_odometer_and_coolant_temp(uint8_t coolant_temp, float odometer,
+void send_odometer_and_coolant_temp(uint8_t coolant_temp, uint32_t odometer,
 		uint32_t delay_before_send)
 {
 	coolant_temp += 39;  // incorrect formula?
 	odometer *= 10;
-	uint32_t mileage = round(odometer);
 	HAL_Delay(delay_before_send);
 	TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-	TxHeader.Identifier = 0xF6;
+	TxHeader.Identifier = CAN_ID_ODOMETER_TO_IPC;
 	memset(TxData8, 0, sizeof(TxData8));
 	TxData8[0] = 0x8E; // 0x8e;  //0x88;
 	TxData8[1] = coolant_temp;
 
-	// It looks like you cannot decrease the displayed value (contrary to e.g. Peugeot 308 T9).
-	TxData8[2] = (uint8_t) (mileage >> 16);
-	TxData8[3] = (uint8_t) (mileage >> 8);
-	TxData8[4] = (uint8_t) mileage;
+	// Be careful when paying with this frame - you cannot decrease the displayed value (contrary to e.g. Peugeot 308 T9).
+	TxData8[2] = (uint8_t) (odometer >> 16);
+	TxData8[3] = (uint8_t) (odometer >> 8);
+	TxData8[4] = (uint8_t) odometer;
 	TxData8[5] = 0x8E; //0xAA; //0x6f;
 	TxData8[6] = 0xAA; //(uint8_t) round(25.0 / 2.0 - 39.5);
 	TxData8[7] = 0x00; //0xAA; //0x23;

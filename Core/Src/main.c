@@ -51,7 +51,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-//#define EXPERIMENT_WITH_MENU
+// #define EXPERIMENT_WITH_MENU
 #define MENU_UART_INSTANCE USART2
 #define MENU_UART_HANDLE_PTR &huart2
 
@@ -69,7 +69,7 @@
 #define COOLANT_TEMPERATURE 80 // degC
 #define FUEL_LEVEL 75 // %
 #define OIL_TEMP 150
-#define ODOMETER 200001 //(308*MPH2KPH) // km
+#define ODOMETER 0 // please do not change it //(308*MPH2KPH) // km
 
 #define DELAYED_START_INTERVAL 4000
 
@@ -96,6 +96,9 @@ uint8_t RxData0[8];
 
 FDCAN_RxHeaderTypeDef RxHeader1;
 uint8_t RxData1[8];
+uint8_t RxDataUnits[8];
+uint8_t RxDataOdometer[8];
+uint8_t odometer_rx_flag = 0;
 
 FDCAN_TxHeaderTypeDef TxHeader;
 uint8_t TxData8[8];
@@ -141,6 +144,8 @@ typedef struct Flags
 flag_t Flg =
 { 0, };
 #endif
+
+uint32_t mileage = ODOMETER;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -195,9 +200,9 @@ int main(void)
 	MX_TIM3_Init();
 	MX_USART1_UART_Init();
 	/* USER CODE BEGIN 2 */
-	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 
 #ifdef USE_INTERNAL_TEMP_SENSOR
+	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*) Adc.Raw, 2);
 	HAL_TIM_Base_Start(&htim3); /* This timer starts ADC conversion */
 #endif
@@ -263,6 +268,15 @@ int main(void)
 
 	while (1)
 	{
+
+		if (odometer_rx_flag == 1)
+		{
+			odometer_rx_flag = 0;
+			mileage = (RxDataOdometer[0] << 16) | (RxDataOdometer[1] << 8)
+					| (RxDataOdometer[3]);
+			mileage /= 10;
+		}
+
 		if (green_button_flag == 1)
 		{
 			green_button_flag = 0;
@@ -356,9 +370,8 @@ int main(void)
 			CanMsgSoftTimer500 = HAL_GetTick();
 			send_fuel_level_and_oil_temp(FUEL_LEVEL, OIL_TEMP,
 			CAN_MSG_TIME_INTERVAL);
-			send_odometer_and_coolant_temp(COOLANT_TEMPERATURE, ODOMETER,
+			send_odometer_and_coolant_temp(COOLANT_TEMPERATURE, mileage,
 			CAN_MSG_TIME_INTERVAL);
-//			send_text_warning(CAN_MSG_TIME_INTERVAL);
 //			send_maintenance(CAN_MSG_TIME_INTERVAL);
 
 			ssd1306_SetCursor(2, 47);
@@ -367,11 +380,12 @@ int main(void)
 			ssd1306_SetCursor(16, 56);
 			ssd1306_WriteString(lcd_line, Font_6x8, White);
 			ssd1306_UpdateScreen();
+			HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
 		}
 
 #ifdef SEND_ALL_CONSECUTIVE_IDS
 		if ((HAL_GetTick() - CanMsgSoftTimer > CAN_MSG_REPEAT_PERIOD)
-				&& (msg_id <= 0x7FF))
+				&& (msg_id <= 0x7FF) && (msg_id != CAN_ID_ODOMETER_TO_IPC))
 		{
 			CanMsgSoftTimer = HAL_GetTick();
 
@@ -524,6 +538,20 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 			/* Reception Error */
 			Error_Handler();
 		}
+		else if (RxHeader1.Identifier == 0x2D7) // choice of units
+		{
+			memcpy(RxDataUnits, RxData1, 8);
+		}
+		else if ((RxHeader1.Identifier == CAN_ID_ODOMETER_FROM_IPC)
+				&& (RxHeader1.DataLength == 6)) // odometer
+		{
+			odometer_rx_flag = 1;
+			memcpy(RxDataOdometer, RxData1, 8);
+		}
+		else
+		{
+			;
+		}
 
 		if (HAL_FDCAN_ActivateNotification(hfdcan,
 		FDCAN_IT_RX_FIFO1_NEW_MESSAGE, 0) != HAL_OK)
@@ -596,15 +624,15 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void DisplayUnitsAndLanguage(void)
 {
 	int str_length = 0;
-	if (RxData1[1] == 0x00)
+	if (RxDataUnits[1] == 0x00)
 	{
 		str_length = sprintf(lcd_line, "l/100 km");
 	}
-	else if (RxData1[1] == 0xE0)
+	else if (RxDataUnits[1] == 0xE0)
 	{
 		str_length = sprintf(lcd_line, "mpg");
 	}
-	else if (RxData1[1] == 0x40)
+	else if (RxDataUnits[1] == 0x40)
 	{
 		str_length = sprintf(lcd_line, "km/l");
 	}
@@ -613,7 +641,7 @@ void DisplayUnitsAndLanguage(void)
 		str_length = sprintf(lcd_line, "Sth went wrong!");
 	}
 
-	if (RxData1[0] == 0x01)
+	if (RxDataUnits[0] == 0x01)
 	{
 		sprintf(lcd_line + str_length, " & EN          ");
 	}
@@ -628,14 +656,14 @@ void DisplayUnitsAndLanguage(void)
  * @brief  This function is executed in case of error occurrence.
  * @retval None
  */
-void Error_Handler(void)
+void Error_Handler(void) // disabled to catch the odometer
 {
 	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
-	__disable_irq();
-	while (1)
-	{
-	}
+//	__disable_irq();
+//	while (1)
+//	{
+//	}
 	/* USER CODE END Error_Handler_Debug */
 }
 
