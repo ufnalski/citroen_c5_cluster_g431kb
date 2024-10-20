@@ -73,7 +73,7 @@
 
 #define DELAYED_START_INTERVAL 4000
 
-//#define SEND_ALL_CONSECUTIVE_IDS
+// #define SEND_ALL_CONSECUTIVE_IDS
 #define BEGINING_FROM_ID 0
 #define PATTERN_TO_BE_SEND   0x55
 #define FDCAN_DLC_BYTES_MIN 3
@@ -374,18 +374,20 @@ int main(void)
 			CAN_MSG_TIME_INTERVAL);
 //			send_maintenance(CAN_MSG_TIME_INTERVAL);
 
+#ifndef SEND_ALL_CONSECUTIVE_IDS
 			ssd1306_SetCursor(2, 47);
 			ssd1306_WriteString("Units & language:", Font_6x8, White);
 			DisplayUnitsAndLanguage();
 			ssd1306_SetCursor(16, 56);
 			ssd1306_WriteString(lcd_line, Font_6x8, White);
 			ssd1306_UpdateScreen();
+#endif
 			HAL_GPIO_TogglePin(BLUE_LED_GPIO_Port, BLUE_LED_Pin);
 		}
 
 #ifdef SEND_ALL_CONSECUTIVE_IDS
 		if ((HAL_GetTick() - CanMsgSoftTimer > CAN_MSG_REPEAT_PERIOD)
-				&& (msg_id <= 0x7FF) && (msg_id != CAN_ID_ODOMETER_TO_IPC))
+				&& (msg_id <= 0x7FF))
 		{
 			CanMsgSoftTimer = HAL_GetTick();
 
@@ -396,10 +398,14 @@ int main(void)
 				TxHeader.DataLength = msg_length;
 				TxHeader.Identifier = msg_id;
 				memset(TxData8, PATTERN_TO_BE_SEND, sizeof(TxData8));
-				if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData8)
-						!= HAL_OK)
+
+				if (msg_id != CAN_ID_ODOMETER_TO_IPC)
 				{
-					Error_Handler();
+					if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader,
+							TxData8) != HAL_OK)
+					{
+						Error_Handler();
+					}
 				}
 			}
 
